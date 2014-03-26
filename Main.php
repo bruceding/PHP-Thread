@@ -23,7 +23,7 @@
 
     private $_threads = array();
 
-    protected $_pidFile = '/var/tmp/';
+//    protected $_pidFile = '/var/tmp/';
 
     public function __construct() {
         $this->init();
@@ -32,9 +32,7 @@
     public function init() {
         
         $this->isParent = true;
-        $pid = getmypid();
-        $this->pid = $pid;
-        $this->_pidFile = $this->_pidFile . "main_{$pid}.pid";
+        $this->pid = getmypid();
     }
 
     /**
@@ -140,10 +138,6 @@
         }
 
         $this->_registerSigHandler();
-        $fp = fopen($this->_pidFile, 'w+');
-        if (!flock($fp, LOCK_EX | LOCK_NB)) {
-            exit('already running');
-        }
         $this->isRunning = true;
         if ($threads) {
             $this->_threads = array_merge($this->_threads, $threads); 
@@ -193,7 +187,7 @@
      */
     public function stop() {
         echo $this->pid . ' parent process exiting... ' . PHP_EOL;
-        unlink($this->_pidFile);
+//        unlink($this->_pidFile);
         $this->isRunning = false;
     }
 
