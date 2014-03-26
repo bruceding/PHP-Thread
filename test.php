@@ -3,7 +3,7 @@
 include("ThreadTest.php");
 
 $threads[]  = new ThreadTest();
-$threads[]  = new ThreadTest();
+$threads[]  = new IChildTest();
 
 $main = new Thread_Main();
 

@@ -16,3 +16,15 @@ class ThreadTest extends Thread_Child {
     }
 
 }
+
+class IChildTest implements Thread_IChild {
+    
+    public $pid;
+    public function doTask() {
+        
+        for($i = 0; $i < 10; $i++) {
+            echo $this->pid . "\t" . $i . PHP_EOL;
+        }
+        exit;
+    }
+}

@@ -97,7 +97,7 @@
      */
     private  function _fork($thread) {
 
-        if (!($thread instanceof Thread_Child)) {
+        if (!($thread instanceof Thread_Child || $thread instanceof Thread_IChild)) {
             return false;
         }
         $pid = pcntl_fork();

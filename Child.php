@@ -1,5 +1,11 @@
 <?php
 include('Main.php');
+
+interface Thread_IChild {
+
+    public function doTask(); 
+}
+
 /**
  * Thread_Child 
  * 子线程
