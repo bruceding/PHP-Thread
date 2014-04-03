@@ -25,6 +25,9 @@
 
 //    protected $_pidFile = '/var/tmp/';
 
+    private $_iniFile ;
+    private $_configOptions = array();
+
     public function __construct() {
         $this->init();
     }
@@ -35,6 +38,19 @@
         $this->pid = getmypid();
     }
 
+    public function setConfigFile($configFile) {
+        
+        if (!is_file($configFile)) {
+            exit('not find config file');
+        }
+        
+        if (trim(pathinfo($configFile, PATHINFO_EXTENSION)) != 'ini') {
+            exit('config file must be ini file');
+        }
+
+        $this->_iniFile = $configFile;
+
+    } 
     /**
      * _registerSigHandler 
      * 信号注册
@@ -114,16 +130,6 @@
     }
 
     /**
-    public function addThread(Thread_Child $thread) {
-        
-        if ($this->isParent) {
-            echo 'add thread';
-            $this->_threads[] = $thread;
-        }
-    }
-    **/
-
-    /**
      * run 
      * 主进程运行，并fork子进程 
      *
@@ -150,6 +156,12 @@
                 }
             }
 
+            try {
+                $this->_quitExcessThreads();
+                $this->_setUpThreads();
+            } catch (Exception $e) {
+                // 可以记录log，此处先忽略
+            }
             pcntl_signal_dispatch();
             if (!$this->_child) {
                 $this->stop();
@@ -160,6 +172,108 @@
         return true;
     }
 
+    /**
+     * runWithConfig 
+     * 通过配置文件开启多进程
+     * 可以控制多进程的数量
+     * 
+     * @param mixed $configFile 
+     * @access public
+     */
+    public function runWithConfig($configFile) {
+        
+        if (!$this->isParent) {
+            return false;
+        }
+
+        $this->setConfigFile($configFile);
+        list($childName, $childCount) = $this->_parseConfigFile();
+
+        for ($i = 0; $i < $childCount; $i++) {
+            $threads[] = new $childName();
+        }
+
+        return $this->run($threads);
+
+    }
+
+
+    /**
+     * _setUpThreads 
+     * 解析配置文件
+     * 如果配置文件中的进程数量多于实际运行的进程，增加进程数量
+     * 
+     * @access private
+     */
+    private function _setUpThreads() {
+
+        if ($this->_iniFile) {
+            list($childName, $childCount) = $this->_parseConfigFile();
+            if (count($this->_child) < $childCount) {
+
+                for ($i = count($this->_child); $i < $childCount; $i++) {
+                    $this->_threads[] = new $childName();
+                }
+            } 
+        }
+    } 
+
+    /**
+     * _quitExcessThreads 
+     * 解析配置文件
+     * 如果配置文件中的数量小于运行的进程的数量，则关闭多余的进程
+     * 
+     * @access private
+     */
+    private function _quitExcessThreads() {
+ 
+        if ($this->_iniFile) {
+            list($childName, $childCount) = $this->_parseConfigFile();
+            if (count($this->_child) > $childCount) {
+                $i = 0;
+                foreach ($this->_child as $pid => $thread) {
+                    if ($i ==  count($this->_child) - $childCount) { 
+                        break;
+                    }
+
+                    posix_kill($pid, SIGTERM);    
+                    $i++;
+                }
+            }
+            
+        }
+    }
+    /**
+     * _parseConfigFile 
+     * 解析配置文件
+     *  + class : 运行的子进程类名
+     *  + count : 进程的数量
+     *
+     * @access private
+     */
+    private function _parseConfigFile() {
+    
+        $this->_configOptions = parse_ini_file($this->_iniFile);
+        
+        if (!$this->_configOptions['class']) {
+            throw new Exception('not find class config');
+        }
+
+        $childName = $this->_configOptions['class'];
+
+        if (!class_exists($childName)) {
+            throw new Exception ("$childName not exists");
+        }
+        $childClass = new $childName();
+
+        if (!$childClass) {
+            throw new Exception('create class faile ' . $childName);
+        }
+
+        $childCount = intval($this->_configOptions['count']) ? intval($this->_configOptions['count'])  : 1;
+
+        return array($childName, $childCount);
+    }
     /**
      * _cleanup 
      * 父进程接受到退出信号时，给子进程发送SIGTERM信号
