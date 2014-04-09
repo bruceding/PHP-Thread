@@ -1,13 +1,13 @@
 <?php
  /**
   * Thread_Main 
-  * 主线程
+  * 主进程类
   * 
   * @package 
   * @version $id$
   * @copyright 1997-2005 The PHP Group
-  * @author Tobias Schlitt <toby@php.net> 
-  * @license PHP Version 3.0 {@link http://www.php.net/license/3_0.txt}
+  * @author bruce ding <dingjingdjdj@gmail.com> 
+  * @license 
   */
  class Thread_Main {
 
@@ -17,16 +17,15 @@
 
     public $isParent = true;
 
-//    public $parent = null;
-
     private $_child = array();
 
     private $_threads = array();
 
-//    protected $_pidFile = '/var/tmp/';
-
-    private $_iniFile ;
-    private $_configOptions = array();
+    /**
+     * 配置类的引用 
+     * @see Thread_Config
+     */
+    private $_config ;
 
     public function __construct() {
         $this->init();
@@ -38,19 +37,6 @@
         $this->pid = getmypid();
     }
 
-    public function setConfigFile($configFile) {
-        
-        if (!is_file($configFile)) {
-            exit('not find config file');
-        }
-        
-        if (trim(pathinfo($configFile, PATHINFO_EXTENSION)) != 'ini') {
-            exit('config file must be ini file');
-        }
-
-        $this->_iniFile = $configFile;
-
-    } 
     /**
      * _registerSigHandler 
      * 信号注册
@@ -95,10 +81,10 @@
      * _waitChild 
      * 处理退出的子进程
      * 
-     * @access private
+     * @access protected
      * @return void
      */
-    private function _waitChild() {
+    protected function _waitChild() {
           while( ($pid = pcntl_waitpid(-1, $status, WNOHANG)) > 0 ) {
                unset($this->_child[$pid]);
           }
@@ -108,10 +94,10 @@
      * _fork 
      * 
      * @param mixed $thread 
-     * @access private
+     * @access protected
      * @return bool
      */
-    private  function _fork($thread) {
+    protected  function _fork($thread) {
 
         if (!($thread instanceof Thread_Child || $thread instanceof Thread_IChild)) {
             return false;
@@ -126,7 +112,8 @@
             $thread->pid = $pid;
             $thread->doTask();
         }
-            return true;
+
+        return true;
     }
 
     /**
@@ -168,7 +155,9 @@
             } 
             sleep(1);
         }
-        echo $this->pid . ' parent process exited ' . PHP_EOL;
+        if (defined('DEBUG')) {
+            echo $this->pid . ' parent process exited ' . PHP_EOL;
+        }
         return true;
     }
 
@@ -177,26 +166,28 @@
      * 通过配置文件开启多进程
      * 可以控制多进程的数量
      * 
-     * @param mixed $configFile 
+     * @param Thread_Config $config 
      * @access public
      */
-    public function runWithConfig($configFile) {
+    public function runWithConfig(Thread_Config $config) {
         
         if (!$this->isParent) {
             return false;
         }
 
-        $this->setConfigFile($configFile);
-        list($childName, $childCount) = $this->_parseConfigFile();
+        if (!$config) {
+            exit('config error');
+        }
 
-        for ($i = 0; $i < $childCount; $i++) {
-            $threads[] = new $childName();
+        $this->_config = $config;
+
+        for ($i = 0; $i < $this->_config->classCount; $i++) {
+            $threads[] = new $this->_config->className ();
         }
 
         return $this->run($threads);
 
     }
-
 
     /**
      * _setUpThreads 
@@ -207,12 +198,12 @@
      */
     private function _setUpThreads() {
 
-        if ($this->_iniFile) {
-            list($childName, $childCount) = $this->_parseConfigFile();
-            if (count($this->_child) < $childCount) {
+        if ($this->_config) {
+            $this->_config->parseConfigFile();
+            if (count($this->_child) < $this->_config->classCount) {
 
-                for ($i = count($this->_child); $i < $childCount; $i++) {
-                    $this->_threads[] = new $childName();
+                for ($i = count($this->_child); $i < $this->_config->classCount; $i++) {
+                    $this->_threads[] = new $this->_config->className ();
                 }
             } 
         }
@@ -227,12 +218,12 @@
      */
     private function _quitExcessThreads() {
  
-        if ($this->_iniFile) {
-            list($childName, $childCount) = $this->_parseConfigFile();
-            if (count($this->_child) > $childCount) {
+        if ($this->_config) {
+            $this->_config->parseConfigFile();
+            if (count($this->_child) > $this->_config->classCount) {
                 $i = 0;
                 foreach ($this->_child as $pid => $thread) {
-                    if ($i ==  count($this->_child) - $childCount) { 
+                    if ($i ==  count($this->_child) - $this->_config->classCount) { 
                         break;
                     }
 
@@ -242,37 +233,6 @@
             }
             
         }
-    }
-    /**
-     * _parseConfigFile 
-     * 解析配置文件
-     *  + class : 运行的子进程类名
-     *  + count : 进程的数量
-     *
-     * @access private
-     */
-    private function _parseConfigFile() {
-    
-        $this->_configOptions = parse_ini_file($this->_iniFile);
-        
-        if (!$this->_configOptions['class']) {
-            throw new Exception('not find class config');
-        }
-
-        $childName = $this->_configOptions['class'];
-
-        if (!class_exists($childName)) {
-            throw new Exception ("$childName not exists");
-        }
-        $childClass = new $childName();
-
-        if (!$childClass) {
-            throw new Exception('create class faile ' . $childName);
-        }
-
-        $childCount = intval($this->_configOptions['count']) ? intval($this->_configOptions['count'])  : 1;
-
-        return array($childName, $childCount);
     }
     /**
      * _cleanup 
@@ -300,7 +260,9 @@
      * @return void
      */
     public function stop() {
-        echo $this->pid . ' parent process exiting... ' . PHP_EOL;
+        if (defined('DEBUG')) {
+            echo $this->pid . ' parent process exiting... ' . PHP_EOL;
+        }
 //        unlink($this->_pidFile);
         $this->isRunning = false;
     }

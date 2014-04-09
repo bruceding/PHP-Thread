@@ -1,6 +1,16 @@
 <?php
 include('Main.php');
 
+/**
+ * Thread_IChild 
+ * 子进程接口
+ * 
+ * @package 
+ * @version $id$
+ * @copyright 1997-2005 The PHP Group
+ * @author bruce ding <dingjingdjdj@gmail.com> 
+ * @license 
+ */
 interface Thread_IChild {
 
     public function doTask(); 
@@ -8,15 +18,16 @@ interface Thread_IChild {
 
 /**
  * Thread_Child 
- * 子线程
+ * 子进程类
  * 
- * @extends Thread_Main
+ * @uses Thread
+ * @uses _Main
  * @abstract
  * @package 
  * @version $id$
  * @copyright 1997-2005 The PHP Group
- * @author Tobias Schlitt <toby@php.net> 
- * @license PHP Version 3.0 {@link http://www.php.net/license/3_0.txt}
+ * @author bruce ding <dingjingdjdj@gmail.com> 
+ * @license 
  */
 abstract class Thread_Child extends Thread_Main{
 
@@ -45,9 +56,7 @@ abstract class Thread_Child extends Thread_Main{
 
         $this->isRunning = true;
         $this->_registerSigHandler();
-        echo $this->pid . ' start to process ' . PHP_EOL;
         $this->process();
-        echo $this->pid . ' process exited' . PHP_EOL;
         exit;
     }
 
