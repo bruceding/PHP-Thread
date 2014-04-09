@@ -71,12 +71,13 @@ count = 2
 
 ```
 $configFile = dirname(__FILE__) . '/testThread.ini';
-
+$config = new Thread_Config($configFile);
 $main = new Thread_Main();
 
-$main->runWithConfig($configFile);
+$main->runWithConfig($config);
 ```
 # 注意事项
 
 在子类方式中，子进程对信号进行了处理，对退出信号进行忽略。
+
 父进程接受到子进程时，首先会对子进程进程关闭。若不需要默认行为，子进程可以覆写stop。
